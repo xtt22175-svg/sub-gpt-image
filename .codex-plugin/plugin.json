@@ -1,6 +1,6 @@
 {
   "name": "sub2api-image",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex-native image generation and editing through a user-configured Sub2API OpenAI-compatible Images API.",
   "author": {
     "name": "Sub2API Image Plugin Maintainers"

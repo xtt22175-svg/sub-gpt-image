@@ -45,6 +45,24 @@ Then run health_check.
 
 The key is stored on the user's machine in Codex plugin private data. It is not stored in this repository.
 
+## Endpoint Rules
+
+Set `base_url` to the OpenAI-compatible API root, usually ending in `/v1`:
+
+```text
+https://your-sub2api.example/v1
+```
+
+The plugin appends the image API paths:
+
+- Text-to-image: `POST /images/generations`
+- Image edit / image-to-image: `POST /images/edits`
+
+So the full request paths are usually:
+
+- `https://your-sub2api.example/v1/images/generations`
+- `https://your-sub2api.example/v1/images/edits`
+
 ## Usage Examples
 
 Generate one image:
@@ -72,6 +90,8 @@ Use Sub2API Image to edit this local image: C:\path\to\image.png
 Edit request: keep the subject unchanged and replace the background with a clean studio backdrop.
 ```
 
+For transient gateway disconnects or timeouts, generation and edit requests retry once by default. For raw concurrency testing, set `retry_attempts` to `0`. For smoother user-facing runs, set it between `2` and `5`.
+
 ## Tools
 
 The plugin exposes these MCP tools to Codex:
@@ -79,9 +99,9 @@ The plugin exposes these MCP tools to Codex:
 - `configure_sub2api(base_url, api_key, default_model?)`
 - `health_check()`
 - `list_image_models()`
-- `generate_image(prompt, size?, quality?, model?, output_format?, output_dir?)`
-- `edit_image(image_path, prompt, mask_path?, size?, quality?, model?, output_format?, output_dir?)`
-- `generate_batch(items[], concurrency?, output_dir?)`
+- `generate_image(prompt, size?, quality?, model?, output_format?, output_dir?, retry_attempts?)`
+- `edit_image(image_path, prompt, mask_path?, size?, quality?, model?, output_format?, output_dir?, retry_attempts?)`
+- `generate_batch(items[], concurrency?, output_dir?, retry_attempts?)`
 
 In normal use, users do not need to call tool names manually. They can describe the image task directly in Codex.
 
@@ -101,8 +121,9 @@ Codex returns the generated file path, model, size, quality, format, and elapsed
 - Codex with plugin and MCP tool support.
 - Python 3.10 or newer available as `python`.
 - A Sub2API service compatible with the OpenAI Images API:
-  - `GET /models`
   - `POST /images/generations`
   - `POST /images/edits`
+
+`GET /models` is used only for optional model listing. `health_check` remains usable when `/models` is unavailable but the image endpoints are configured.
 
 If the target machine exposes Python as `python3`, ask Codex to change `"command": "python"` to `"command": "python3"` in `.mcp.json` before installation.

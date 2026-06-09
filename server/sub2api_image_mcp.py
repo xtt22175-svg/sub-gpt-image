@@ -23,12 +23,14 @@ from urllib import error, parse, request
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "sub2api-image"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.1.1"
 DEFAULT_MODEL = "gpt-image-2"
 DEFAULT_SIZE = "1024x1024"
 DEFAULT_QUALITY = "auto"
 DEFAULT_OUTPUT_FORMAT = "png"
 DEFAULT_TIMEOUT_SECONDS = 420.0
+DEFAULT_RETRY_ATTEMPTS = 1
+DEFAULT_RETRY_BASE_DELAY_SECONDS = 2.0
 VALID_OUTPUT_FORMATS = {"png", "jpeg", "jpg", "webp"}
 VALID_QUALITIES = {"low", "medium", "high", "auto"}
 MIN_PIXELS = 655_360
@@ -190,6 +192,61 @@ def require_config() -> dict[str, str]:
 
 def endpoint_url(config: dict[str, str], path: str) -> str:
     return f"{config['base_url'].rstrip('/')}/{path.lstrip('/')}"
+
+
+def normalize_retry_attempts(value: Any) -> int:
+    attempts = int(value if value is not None else DEFAULT_RETRY_ATTEMPTS)
+    if attempts < 0 or attempts > 5:
+        raise ValueError("retry_attempts must be between 0 and 5.")
+    return attempts
+
+
+def retry_delay_seconds(attempt_index: int, value: Any = None) -> float:
+    base_delay = float(value if value is not None else DEFAULT_RETRY_BASE_DELAY_SECONDS)
+    if base_delay < 0 or base_delay > 30:
+        raise ValueError("retry_base_delay_seconds must be between 0 and 30.")
+    return base_delay * (2 ** max(0, attempt_index - 1))
+
+
+def is_retryable_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    retryable_fragments = (
+        "remote end closed connection without response",
+        "unexpected_eof_while_reading",
+        "eof occurred in violation of protocol",
+        "timed out",
+        "timeout",
+        "temporarily unavailable",
+        "connection reset",
+        "connection aborted",
+        "connection refused",
+        "http 408",
+        "http 409",
+        "http 425",
+        "http 429",
+        "http 500",
+        "http 502",
+        "http 503",
+        "http 504",
+        "http 520",
+        "http 522",
+        "http 524",
+    )
+    return any(fragment in text for fragment in retryable_fragments)
+
+
+def call_with_retries(operation: Any, args: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    retry_attempts = normalize_retry_attempts(args.get("retry_attempts"))
+    last_error: Exception | None = None
+    for attempt_index in range(retry_attempts + 1):
+        try:
+            return operation(), attempt_index + 1
+        except Exception as exc:  # noqa: BLE001 - retries preserve final redacted error.
+            last_error = exc
+            if attempt_index >= retry_attempts or not is_retryable_error(exc):
+                raise
+            time.sleep(retry_delay_seconds(attempt_index + 1, args.get("retry_base_delay_seconds")))
+    raise RuntimeError(str(last_error or "Image request failed."))
 
 
 def response_to_json(data: bytes) -> dict[str, Any]:
@@ -411,25 +468,23 @@ def call_list_image_models(args: dict[str, Any] | None = None) -> dict[str, Any]
 def call_health_check(args: dict[str, Any] | None = None) -> dict[str, Any]:
     config = require_config()
     started_at = time.time()
+    result: dict[str, Any] = {
+        "ok": True,
+        "configured": True,
+        "base_url": redact_text(config["base_url"]),
+        "default_model": config["default_model"],
+        "generation_endpoint": "/images/generations",
+        "edit_endpoint": "/images/edits",
+    }
     try:
         models = call_list_image_models({}).get("models", [])
-        return {
-            "ok": True,
-            "configured": True,
-            "base_url": redact_text(config["base_url"]),
-            "default_model": config["default_model"],
-            "image_models": models,
-            "elapsed_seconds": round(time.time() - started_at, 3),
-        }
+        result["models_ok"] = True
+        result["image_models"] = models
     except Exception as exc:  # noqa: BLE001 - health check reports redacted diagnostics.
-        return {
-            "ok": False,
-            "configured": True,
-            "base_url": redact_text(config["base_url"]),
-            "default_model": config["default_model"],
-            "error": redact_text(str(exc), [config["api_key"]]),
-            "elapsed_seconds": round(time.time() - started_at, 3),
-        }
+        result["models_ok"] = False
+        result["models_error"] = redact_text(str(exc), [config["api_key"]])
+    result["elapsed_seconds"] = round(time.time() - started_at, 3)
+    return result
 
 
 def call_generate_image(args: dict[str, Any]) -> dict[str, Any]:
@@ -439,12 +494,15 @@ def call_generate_image(args: dict[str, Any]) -> dict[str, Any]:
     output_dir = resolve_output_dir(args.get("output_dir"))
     label = str(args.get("label") or payload["size"] or "image")
     started_at = time.time()
-    response = request_json(
-        config=config,
-        method="POST",
-        path="/images/generations",
-        payload=payload,
-        timeout=float(args.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS),
+    response, attempts = call_with_retries(
+        lambda: request_json(
+            config=config,
+            method="POST",
+            path="/images/generations",
+            payload=payload,
+            timeout=float(args.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS),
+        ),
+        args,
     )
     ended_at = time.time()
     saved = save_image_response(
@@ -461,6 +519,7 @@ def call_generate_image(args: dict[str, Any]) -> dict[str, Any]:
             "size": payload["size"],
             "quality": payload["quality"],
             "output_format": output_format,
+            "attempts": attempts,
         }
     )
     return saved
@@ -486,12 +545,15 @@ def call_edit_image(args: dict[str, Any]) -> dict[str, Any]:
     output_dir = resolve_output_dir(args.get("output_dir"))
     label = str(args.get("label") or f"edit-{image_path.stem}")
     started_at = time.time()
-    response = request_multipart(
-        config=config,
-        path="/images/edits",
-        fields=fields,
-        files=files,
-        timeout=float(args.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS),
+    response, attempts = call_with_retries(
+        lambda: request_multipart(
+            config=config,
+            path="/images/edits",
+            fields=fields,
+            files=files,
+            timeout=float(args.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS),
+        ),
+        args,
     )
     ended_at = time.time()
     saved = save_image_response(
@@ -509,6 +571,7 @@ def call_edit_image(args: dict[str, Any]) -> dict[str, Any]:
             "quality": payload["quality"],
             "output_format": output_format,
             "source_image_path": str(image_path),
+            "attempts": attempts,
         }
     )
     return saved
@@ -532,6 +595,8 @@ def call_generate_batch(args: dict[str, Any]) -> dict[str, Any]:
             "size": args.get("size"),
             "quality": args.get("quality"),
             "output_format": args.get("output_format"),
+            "retry_attempts": args.get("retry_attempts"),
+            "retry_base_delay_seconds": args.get("retry_base_delay_seconds"),
             "output_dir": output_dir,
             **raw_item,
         }
@@ -639,6 +704,13 @@ def tools_list() -> list[dict[str, Any]]:
                         "type": "string",
                         "description": "Optional local output directory.",
                     },
+                    "retry_attempts": {
+                        "type": "integer",
+                        "description": "Retry count for transient gateway or connection failures, 0 to 5.",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "default": DEFAULT_RETRY_ATTEMPTS,
+                    },
                 },
                 "required": ["prompt"],
             },
@@ -675,6 +747,13 @@ def tools_list() -> list[dict[str, Any]]:
                         "type": "string",
                         "description": "Optional local output directory.",
                     },
+                    "retry_attempts": {
+                        "type": "integer",
+                        "description": "Retry count for transient gateway or connection failures, 0 to 5.",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "default": DEFAULT_RETRY_ATTEMPTS,
+                    },
                 },
                 "required": ["image_path", "prompt"],
             },
@@ -709,6 +788,13 @@ def tools_list() -> list[dict[str, Any]]:
                     "output_format": {
                         "type": "string",
                         "description": "Optional batch default output format.",
+                    },
+                    "retry_attempts": {
+                        "type": "integer",
+                        "description": "Retry count for transient gateway or connection failures, 0 to 5.",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "default": DEFAULT_RETRY_ATTEMPTS,
                     },
                 },
                 "required": ["items"],

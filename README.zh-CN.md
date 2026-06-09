@@ -36,6 +36,24 @@ https://github.com/xtt22175-svg/sub-gpt-image
 
 配置完成后，key 会保存在本机 Codex 插件私有数据目录中。后续使用同一个 Codex 环境时，通常不需要重复配置。
 
+## 接口规则
+
+`base_url` 应填写到 OpenAI-compatible API 根路径，通常以 `/v1` 结尾，例如：
+
+```text
+https://your-sub2api.example/v1
+```
+
+插件会自动拼接图片接口：
+
+- 文字生图：`POST /images/generations`
+- 以图生图 / 编辑图片：`POST /images/edits`
+
+因此完整请求路径通常是：
+
+- `https://your-sub2api.example/v1/images/generations`
+- `https://your-sub2api.example/v1/images/edits`
+
 ## 基本使用
 
 生成单张图片：
@@ -89,6 +107,8 @@ C:\path\to\image.png
 
 结果保存到本地输出目录，并返回文件路径。
 ```
+
+如果网关偶发断连或超时，插件默认会对生成和编辑请求重试 1 次。需要压测原始并发能力时，可以让 Codex 设置 `retry_attempts: 0`；需要提高普通使用成功率时，可以设置为 2 到 5。
 
 ## 返回内容
 
