@@ -1,0 +1,42 @@
+{
+  "name": "sub2api-image",
+  "version": "0.1.0",
+  "description": "Codex-native image generation and editing through a user-configured Sub2API OpenAI-compatible Images API.",
+  "author": {
+    "name": "Sub2API Image Plugin Maintainers"
+  },
+  "homepage": "https://github.com/xtt22175-svg/sub-gpt-image",
+  "repository": "https://github.com/xtt22175-svg/sub-gpt-image",
+  "license": "MIT",
+  "keywords": [
+    "sub2api",
+    "image generation",
+    "images api",
+    "mcp",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Sub2API Image",
+    "shortDescription": "Generate and edit images with a private Sub2API key.",
+    "longDescription": "Sub2API Image lets Codex configure a local Sub2API endpoint once, then generate, edit, and batch-generate images through an OpenAI-compatible Images API without exposing the user's key in replies or logs.",
+    "developerName": "Sub2API Image Plugin Maintainers",
+    "category": "Productivity",
+    "websiteURL": "https://github.com/xtt22175-svg/sub-gpt-image",
+    "privacyPolicyURL": "https://github.com/xtt22175-svg/sub-gpt-image",
+    "termsOfServiceURL": "https://github.com/xtt22175-svg/sub-gpt-image",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Configure my Sub2API image key",
+      "Generate an image from this prompt",
+      "Batch-generate 2K and 4K images"
+    ],
+    "brandColor": "#116466",
+    "screenshots": []
+  }
+}
