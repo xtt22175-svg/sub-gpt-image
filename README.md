@@ -1,50 +1,80 @@
 # Sub2API Image for Codex
 
-Codex plugin for image generation and editing through a user-configured Sub2API OpenAI-compatible Images API.
+Sub2API Image is a Codex plugin for connecting a user-owned Sub2API / OpenAI-compatible Images API to Codex. After configuration, Codex can generate images, edit local images, and run concurrent batch image jobs through natural language requests.
 
-The repository contains only runtime code and user documentation. It does not include private endpoints, API keys, test assets, test logs, or private validation scripts.
+中文说明: [README.zh-CN.md](README.zh-CN.md)
 
-## What To Send Someone
+This repository contains the plugin runtime and user-facing documentation only. It does not include any built-in API key or private endpoint.
 
-Send them this:
+## Install
+
+Give this repository URL to Codex:
 
 ```text
-Give this repository link to Codex, ask Codex to install the plugin, then provide your own Sub2API base URL, API key, and image prompt. Codex should configure Sub2API, run a health check, and generate or edit images directly from Codex.
+https://github.com/xtt22175-svg/sub-gpt-image
 ```
 
-## What The Recipient Can Paste Into Codex
-
-Replace the placeholders with their own values:
+A recipient can paste:
 
 ```text
-Install this Codex plugin from https://github.com/xtt22175-svg/sub-gpt-image.
+Install this Codex plugin: https://github.com/xtt22175-svg/sub-gpt-image
 
-After installing it, configure Sub2API image generation with:
+After installation, configure it with my Sub2API base_url and api_key.
+Run health_check first. If it passes, generate images from my prompt.
+Do not echo my API key in your response.
+```
+
+## First-Time Configuration
+
+Provide Codex with:
+
+- `base_url`: Sub2API endpoint, for example `https://your-sub2api.example/v1`
+- `api_key`: the user's own Sub2API API key
+- `default_model`: optional default image model, for example `gpt-image-2`
+
+Example:
+
+```text
+Configure Sub2API Image:
 - base_url: https://your-sub2api.example/v1
 - api_key: <YOUR_SUB2API_API_KEY>
 - default_model: gpt-image-2
 
-Run health_check. If it passes, generate this image:
-<YOUR_IMAGE_PROMPT>
-
-Do not echo my API key in your response.
+Then run health_check.
 ```
 
-For simultaneous 2K and 4K generation:
+The key is stored on the user's machine in Codex plugin private data. It is not stored in this repository.
+
+## Usage Examples
+
+Generate one image:
 
 ```text
-Use the Sub2API image plugin to generate two images at the same time:
-- 2K: 2048x1152
-- 4K: 3840x2160
-- concurrency: 2
-- prompt: <YOUR_IMAGE_PROMPT>
-
-Return the saved file paths, model, size, quality, format, and elapsed time. Do not echo my API key.
+Use Sub2API Image to generate a 1024x1024 image.
+Prompt: a modern reading room in soft morning light, realistic photography style.
 ```
 
-## Codex Tools
+Generate 2K and 4K concurrently:
 
-The plugin exposes these MCP tools:
+```text
+Use Sub2API Image to generate two images concurrently with concurrency set to 2:
+- 2K: 2048x1152
+- 4K: 3840x2160
+
+Prompt: ...
+Return the saved file paths, model, size, format, and elapsed time.
+```
+
+Edit a local image:
+
+```text
+Use Sub2API Image to edit this local image: C:\path\to\image.png
+Edit request: keep the subject unchanged and replace the background with a clean studio backdrop.
+```
+
+## Tools
+
+The plugin exposes these MCP tools to Codex:
 
 - `configure_sub2api(base_url, api_key, default_model?)`
 - `health_check()`
@@ -53,35 +83,26 @@ The plugin exposes these MCP tools:
 - `edit_image(image_path, prompt, mask_path?, size?, quality?, model?, output_format?, output_dir?)`
 - `generate_batch(items[], concurrency?, output_dir?)`
 
-## Security Model
+In normal use, users do not need to call tool names manually. They can describe the image task directly in Codex.
 
-- No API key or private endpoint is committed to this repository.
-- `configure_sub2api` stores the recipient's key on their own machine under Codex plugin private data (`PLUGIN_DATA/config.json`).
-- Tool results and errors redact authorization tokens, `sk-*` style tokens, and endpoint hosts.
-- Generated images are saved locally. By default, they are saved under the plugin's private data output folder unless `output_dir` is provided.
+## Output
 
-## Runtime Requirements
+Codex returns the generated file path, model, size, quality, format, and elapsed time. Images are saved locally, under the plugin private output directory by default unless `output_dir` is provided.
 
-- Codex with plugin support.
+## Security
+
+- No private API key or endpoint is committed to this repository.
+- The user's API key is stored locally in Codex plugin private data.
+- Tool results and errors redact tokens, keys, and endpoint hosts where possible.
+- Do not share chat logs, screenshots, or terminal output that contain API keys.
+
+## Requirements
+
+- Codex with plugin and MCP tool support.
 - Python 3.10 or newer available as `python`.
-- A Sub2API endpoint compatible with the OpenAI Images API:
+- A Sub2API service compatible with the OpenAI Images API:
   - `GET /models`
   - `POST /images/generations`
   - `POST /images/edits`
 
-The server uses only the Python standard library. No `pip install` step is required.
-
-If a recipient's machine only exposes Python as `python3`, update `.mcp.json` and change `"command": "python"` to `"command": "python3"` before installing.
-
-## Local Development Notes
-
-Public files are:
-
-- `.codex-plugin/plugin.json`
-- `.mcp.json`
-- `server/sub2api_image_mcp.py`
-- `skills/sub2api-image/SKILL.md`
-- `README.md`
-- `LICENSE`
-
-Private smoke tests and live API validation should stay outside this repository before release.
+If the target machine exposes Python as `python3`, ask Codex to change `"command": "python"` to `"command": "python3"` in `.mcp.json` before installation.
