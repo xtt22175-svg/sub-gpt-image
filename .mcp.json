@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sub2api-image": {
+      "command": "python",
+      "args": [
+        "${PLUGIN_ROOT}/server/sub2api_image_mcp.py"
+      ]
+    }
+  }
+}
