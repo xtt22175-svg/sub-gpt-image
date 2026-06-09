@@ -23,7 +23,7 @@ from urllib import error, parse, request
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "sub2api-image"
-SERVER_VERSION = "0.1.1"
+SERVER_VERSION = "0.1.2"
 DEFAULT_MODEL = "gpt-image-2"
 DEFAULT_SIZE = "1024x1024"
 DEFAULT_QUALITY = "auto"
@@ -132,6 +132,15 @@ def validate_size(value: Any) -> str:
 def safe_label(value: str) -> str:
     cleaned = _SAFE_LABEL_RE.sub("-", value.strip())[:80].strip("-")
     return cleaned or "image"
+
+
+def markdown_alt_text(value: str) -> str:
+    cleaned = re.sub(r"[\[\]\r\n]+", " ", str(value)).strip()
+    return cleaned or "image"
+
+
+def markdown_image_path(path: Path) -> str:
+    return path.resolve().as_posix()
 
 
 def unique_output_path(output_dir: Path, label: str, output_format: str, timestamp: float) -> Path:
@@ -399,6 +408,7 @@ def save_image_response(
 
     result: dict[str, Any] = {
         "path": str(output_path.resolve()),
+        "preview_markdown": f"![{markdown_alt_text(label)}]({markdown_image_path(output_path)})",
         "bytes": len(image_bytes),
         "elapsed_seconds": round(ended_at - started_at, 3),
     }

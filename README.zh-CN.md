@@ -116,6 +116,14 @@ C:\path\to\image.png
 
 默认情况下，图片保存到插件私有输出目录。需要保存到指定位置时，可以在请求中说明输出目录。
 
+成功结果还会包含 `preview_markdown`，例如：
+
+```md
+![image](C:/absolute/path/image.png)
+```
+
+Codex 最终回复应直接使用这个字段展示图片，避免只返回本地路径。
+
 ## 安全边界
 
 - 仓库不包含任何 API key 或私有 endpoint。

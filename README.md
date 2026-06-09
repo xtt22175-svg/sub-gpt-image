@@ -109,6 +109,14 @@ In normal use, users do not need to call tool names manually. They can describe 
 
 Codex returns the generated file path, model, size, quality, format, and elapsed time. Images are saved locally, under the plugin private output directory by default unless `output_dir` is provided.
 
+Successful image results also include `preview_markdown`, for example:
+
+```md
+![image](C:/absolute/path/image.png)
+```
+
+Codex should use that field directly in the final reply so the recipient sees the generated images inline, not only local file paths.
+
 ## Security
 
 - No private API key or endpoint is committed to this repository.

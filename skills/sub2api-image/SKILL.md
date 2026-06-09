@@ -14,7 +14,7 @@ Use this plugin's MCP tools for Sub2API/OpenAI-compatible image generation and e
 3. For one prompt, call `generate_image`.
 4. For a local input image path plus an edit instruction, call `edit_image`.
 5. For multiple prompts or requested 2K/4K simultaneous generation, call `generate_batch` with the requested concurrency.
-6. In the final reply, report only image path(s), model, size, quality, format, elapsed time, and any redacted failures.
+6. In the final reply, render each successful image inline using its `preview_markdown` value, then report path(s), model, size, quality, format, elapsed time, attempts, and any redacted failures.
 
 ## Defaults
 
@@ -26,6 +26,7 @@ Use this plugin's MCP tools for Sub2API/OpenAI-compatible image generation and e
 - Generation and edit requests retry transient gateway or connection failures once by default.
 - If no output directory is requested, let the tool save under the plugin's private output directory.
 - For raw concurrency tests, set `retry_attempts` to `0`. For smoother user-facing runs, use the default or set `retry_attempts` from `2` to `5`.
+- Tool results include `preview_markdown` with a Markdown-friendly absolute image path. Use it directly in final replies so images render inside Codex.
 
 ## Endpoint Rules
 
